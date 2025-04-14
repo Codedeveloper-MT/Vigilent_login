@@ -5,19 +5,15 @@ const mongoose = require("mongoose");
 const cors = require("cors");
 const bcrypt = require("bcryptjs");
 
-// Handle Mongoose deprecation warning
-mongoose.set('strictQuery', false); // Add this line
+mongoose.set('strictQuery', false);
 
 const app = express();
 
-// Middleware
 app.use(cors());
 app.use(express.json());
 
-// MongoDB Connection
 const mongoURI = process.env.MANGODB_CONNECT_URL;
 
-// Debugging: Log the environment variables
 console.log("Environment Variables:");
 console.log("MANGODB_CONNECT_URL:", process.env.MANGODB_CONNECT_URL ? "exists" : "missing");
 console.log("PORT:", process.env.PORT);
@@ -38,20 +34,16 @@ mongoose.connect(mongoURI, {
   process.exit(1);
 });
 
-
-// User Schema with composite key (username+password)
 const userSchema = new mongoose.Schema({
   username: { type: String, required: true },
   country: { type: String, required: true },
   phone: { type: String, required: true },
-  password: { type: String, required: true }, // Hashed password
-  plainPassword: { type: String, select: false } // Plain text password (INSECURE)
-}, { _id: false }); // Disable default _id to use our composite key
+  password: { type: String, required: true },
+  plainPassword: { type: String, select: false }
+});
 
-// Create compound index for username+password as primary key
 userSchema.index({ username: 1, password: 1 }, { unique: true });
 
-// Hash password before saving
 userSchema.pre('save', async function(next) {
   if (this.isModified('password')) {
     const salt = await bcrypt.genSalt(10);
@@ -62,7 +54,6 @@ userSchema.pre('save', async function(next) {
 
 const User = mongoose.model("User", userSchema, "vigilantaids_users");
 
-// Registration Endpoint
 app.post("/api/register", async (req, res) => {
   try {
     const { username, country, phone, password } = req.body;
@@ -71,19 +62,17 @@ app.post("/api/register", async (req, res) => {
       return res.status(400).json({ error: "Fill in the missing details" });
     }
 
-    // Check if username already exists (since it's part of our composite key)
     const existingUser = await User.findOne({ username });
     if (existingUser) {
       return res.status(400).json({ error: "Username already exists" });
     }
 
-    // Store both hashed and plain text password (INSECURE)
     const newUser = new User({ 
       username, 
       country, 
       phone, 
       password,
-      plainPassword: password // Storing plain text password (NOT SECURE)
+      plainPassword: password
     });
     
     await newUser.save();
@@ -106,7 +95,6 @@ app.post("/api/register", async (req, res) => {
   }
 });
 
-// Login Endpoint
 app.post("/api/login", async (req, res) => {
   const { username, password } = req.body;
 
@@ -131,11 +119,9 @@ app.post("/api/login", async (req, res) => {
   }
 });
 
-// Forgot Password Endpoint (RETURNS PLAIN TEXT PASSWORD - INSECURE)
 app.post('/api/forgot-password', async (req, res) => {
   try {
     const { username } = req.body;
-    // Explicitly include the plainPassword field
     const user = await User.findOne({ username }).select('+plainPassword');
     
     if (!user) {
@@ -144,14 +130,13 @@ app.post('/api/forgot-password', async (req, res) => {
 
     res.json({ 
       success: true,
-      password: user.plainPassword // Returning plain text password (NOT SECURE)
+      password: user.plainPassword
     });
   } catch (err) {
     res.status(500).json({ error: 'Password retrieval failed' });
   }
 });
 
-// Get User by Username
 app.get("/api/users", async (req, res) => {
   try {
     const { username } = req.query;
@@ -170,19 +155,17 @@ app.get("/api/users", async (req, res) => {
   }
 });
 
-// Update User
-app.put("/api/users/:username", async (req, res) => { // Changed to use username instead of id
+app.put("/api/users/:username", async (req, res) => {
   try {
     const { username } = req.params;
     const { country, phone, password } = req.body;
 
     const updateData = { country, phone };
     
-    // Only update password if it was provided
     if (password) {
       const salt = await bcrypt.genSalt(10);
       updateData.password = await bcrypt.hash(password, salt);
-      updateData.plainPassword = password; // Also update plain text (INSECURE)
+      updateData.plainPassword = password;
     }
 
     const updatedUser = await User.findOneAndUpdate(
@@ -205,8 +188,7 @@ app.put("/api/users/:username", async (req, res) => { // Changed to use username
   }
 });
 
-// Delete User
-app.delete("/api/users/:username", async (req, res) => { // Changed to use username instead of id
+app.delete("/api/users/:username", async (req, res) => {
   try {
     const { username } = req.params;
 

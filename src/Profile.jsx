@@ -14,17 +14,15 @@ const Profile = () => {
 
   const [errors, setErrors] = useState({});
   const [message, setMessage] = useState({ text: "", type: "" });
-  const [isAssistantActive, setIsAssistantActive] = useState(false);
+  const [isAssistantActive, setIsAssistantActive] = useState(true);
   const [isLoading, setIsLoading] = useState(false);
   const navigate = useNavigate();
 
-  // Speech synthesis with error handling
   const speak = (text) => {
     if (!isAssistantActive) return;
-    
     if ("speechSynthesis" in window) {
       try {
-        window.speechSynthesis.cancel(); // Cancel any ongoing speech
+        window.speechSynthesis.cancel();
         const utterance = new SpeechSynthesisUtterance(text);
         utterance.lang = "en-US";
         window.speechSynthesis.speak(utterance);
@@ -35,9 +33,18 @@ const Profile = () => {
   };
 
   useEffect(() => {
-    speak("You are about to create an account. Please fill in all required fields.");
+    if ("speechSynthesis" in window) {
+      try {
+        window.speechSynthesis.cancel();
+        const utterance = new SpeechSynthesisUtterance("You are about to create an account. Please fill in all required fields.");
+        utterance.lang = "en-US";
+        window.speechSynthesis.speak(utterance);
+      } catch (err) {
+        console.error("Speech synthesis error:", err);
+      }
+    }
     return () => {
-      window.speechSynthesis.cancel(); // Clean up on unmount
+      window.speechSynthesis.cancel();
     };
   }, []);
 
@@ -49,21 +56,17 @@ const Profile = () => {
 
   const handleChange = (e) => {
     const { name, value } = e.target;
-    setFormData(prev => ({
+    setFormData((prev) => ({
       ...prev,
-      [name]: value
+      [name]: value,
     }));
-    
-    // Clear error when user starts typing
     if (errors[name]) {
-      setErrors(prev => ({ ...prev, [name]: "" }));
+      setErrors((prev) => ({ ...prev, [name]: "" }));
     }
   };
 
   const validateForm = () => {
     const newErrors = {};
-    const phoneRegex = /^[+]?[(]?[0-9]{1,4}[)]?[-\s.]?[0-9]{1,3}[-\s.]?[0-9]{3,6}$/im;
-    const passwordRegex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)[a-zA-Z\d]{8,}$/;
 
     if (!formData.username.trim()) {
       newErrors.username = "Username is required";
@@ -77,14 +80,12 @@ const Profile = () => {
 
     if (!formData.phone.trim()) {
       newErrors.phone = "Phone number is required";
-    } else if (!phoneRegex.test(formData.phone)) {
-      newErrors.phone = "Please enter a valid phone number";
     }
 
     if (!formData.password) {
       newErrors.password = "Password is required";
-    } else if (!passwordRegex.test(formData.password)) {
-      newErrors.password = "Password must be at least 8 characters with uppercase, lowercase and numbers";
+    } else if (formData.password.length < 5) {
+      newErrors.password = "Password must be at least 5 characters";
     }
 
     if (formData.password !== formData.confirmPassword) {
@@ -97,7 +98,7 @@ const Profile = () => {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    
+
     if (!validateForm()) {
       speak("Please correct the errors in the form.");
       return;
@@ -106,17 +107,17 @@ const Profile = () => {
     setIsLoading(true);
     try {
       const response = await axios.post(
-        "http://localhost:5000/api/register", 
+        "http://localhost:5000/api/register",
         {
           username: formData.username,
           country: formData.country,
           phone: formData.phone,
-          password: formData.password
+          password: formData.password,
         },
         {
           headers: {
-            'Content-Type': 'application/json'
-          }
+            "Content-Type": "application/json",
+          },
         }
       );
 
@@ -124,12 +125,21 @@ const Profile = () => {
         const successMessage = "Account created successfully! Redirecting to login...";
         setMessage({ text: successMessage, type: "success" });
         speak(successMessage);
+        setFormData({
+          username: "",
+          country: "",
+          phone: "",
+          password: "",
+          confirmPassword: "",
+        });
         setTimeout(() => navigate("/login"), 3000);
       }
     } catch (error) {
       let errorMessage = "An error occurred during registration.";
-      if (error.response) {
-        errorMessage = error.response.data.error || errorMessage;
+      if (error.response?.data?.error) {
+        errorMessage = error.response.data.error;
+      } else if (error.message) {
+        errorMessage = error.message;
       }
       setMessage({ text: errorMessage, type: "error" });
       speak(errorMessage);
@@ -142,7 +152,7 @@ const Profile = () => {
     <div className="registration-container">
       <div className="form-container">
         <h2>Create an Account</h2>
-        
+
         {message.text && (
           <p className={`message ${message.type}`}>
             {message.text}
@@ -160,6 +170,7 @@ const Profile = () => {
               className={errors.username ? "error" : ""}
               aria-describedby="usernameHelp"
               required
+              autoComplete="username"
             />
             {errors.username && (
               <small id="usernameHelp" className="error-text">
@@ -172,12 +183,13 @@ const Profile = () => {
             <input
               type="text"
               name="phone"
-              placeholder="Phone Number (e.g., +1234567890)"
+              placeholder="Phone Number"
               value={formData.phone}
               onChange={handleChange}
               className={errors.phone ? "error" : ""}
               aria-describedby="phoneHelp"
               required
+              autoComplete="tel"
             />
             {errors.phone && (
               <small id="phoneHelp" className="error-text">
@@ -195,6 +207,7 @@ const Profile = () => {
               onChange={handleChange}
               className={errors.country ? "error" : ""}
               required
+              autoComplete="country"
             />
             {errors.country && (
               <small className="error-text">{errors.country}</small>
@@ -211,6 +224,7 @@ const Profile = () => {
               className={errors.password ? "error" : ""}
               aria-describedby="passwordHelp"
               required
+              autoComplete="new-password"
             />
             {errors.password && (
               <small id="passwordHelp" className="error-text">
@@ -228,14 +242,15 @@ const Profile = () => {
               onChange={handleChange}
               className={errors.confirmPassword ? "error" : ""}
               required
+              autoComplete="new-password"
             />
             {errors.confirmPassword && (
               <small className="error-text">{errors.confirmPassword}</small>
             )}
           </div>
 
-          <button 
-            type="submit" 
+          <button
+            type="submit"
             disabled={isLoading}
             className={isLoading ? "loading" : ""}
           >

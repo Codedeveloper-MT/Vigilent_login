@@ -9,51 +9,15 @@ const Profile = () => {
     country: "",
     phone: "",
     password: "",
-    confirmPassword: ""
+    confirmPassword: "",
   });
 
   const [errors, setErrors] = useState({});
   const [message, setMessage] = useState({ text: "", type: "" });
-  const [isAssistantActive, setIsAssistantActive] = useState(true);
   const [isLoading, setIsLoading] = useState(false);
   const navigate = useNavigate();
 
-  const speak = (text) => {
-    if (!isAssistantActive) return;
-    if ("speechSynthesis" in window) {
-      try {
-        window.speechSynthesis.cancel();
-        const utterance = new SpeechSynthesisUtterance(text);
-        utterance.lang = "en-US";
-        window.speechSynthesis.speak(utterance);
-      } catch (err) {
-        console.error("Speech synthesis error:", err);
-      }
-    }
-  };
-
-  useEffect(() => {
-    if ("speechSynthesis" in window) {
-      try {
-        window.speechSynthesis.cancel();
-        const utterance = new SpeechSynthesisUtterance("You are about to create an account. Please fill in all required fields.");
-        utterance.lang = "en-US";
-        window.speechSynthesis.speak(utterance);
-      } catch (err) {
-        console.error("Speech synthesis error:", err);
-      }
-    }
-    return () => {
-      window.speechSynthesis.cancel();
-    };
-  }, []);
-
-  const toggleAssistant = () => {
-    const newState = !isAssistantActive;
-    setIsAssistantActive(newState);
-    speak(newState ? "Assistant is ready to help." : "Assistant turned off.");
-  };
-
+  // Handle form field changes
   const handleChange = (e) => {
     const { name, value } = e.target;
     setFormData((prev) => ({
@@ -65,6 +29,7 @@ const Profile = () => {
     }
   };
 
+  // Validate form data
   const validateForm = () => {
     const newErrors = {};
 
@@ -96,18 +61,19 @@ const Profile = () => {
     return Object.keys(newErrors).length === 0;
   };
 
+  // Handle form submission
   const handleSubmit = async (e) => {
     e.preventDefault();
 
     if (!validateForm()) {
-      speak("Please correct the errors in the form.");
+      setMessage({ text: "Please correct the errors in the form.", type: "error" });
       return;
     }
 
     setIsLoading(true);
     try {
       const response = await axios.post(
-        "http://10.220.185.190:5000/api/register",
+        "https://testing-fed3.onrender.com/api/register", 
         {
           username: formData.username,
           country: formData.country,
@@ -122,9 +88,7 @@ const Profile = () => {
       );
 
       if (response.data.success) {
-        const successMessage = "Account created successfully! Redirecting to login...";
-        setMessage({ text: successMessage, type: "success" });
-        speak(successMessage);
+        setMessage({ text: "Account created successfully!", type: "success" });
         setFormData({
           username: "",
           country: "",
@@ -135,14 +99,8 @@ const Profile = () => {
         setTimeout(() => navigate("/login"), 3000);
       }
     } catch (error) {
-      let errorMessage = "An error occurred during registration.";
-      if (error.response?.data?.error) {
-        errorMessage = error.response.data.error;
-      } else if (error.message) {
-        errorMessage = error.message;
-      }
+      const errorMessage = error.response?.data?.error || "An error occurred during registration.";
       setMessage({ text: errorMessage, type: "error" });
-      speak(errorMessage);
     } finally {
       setIsLoading(false);
     }
@@ -168,34 +126,10 @@ const Profile = () => {
               value={formData.username}
               onChange={handleChange}
               className={errors.username ? "error" : ""}
-              aria-describedby="usernameHelp"
               required
               autoComplete="username"
             />
-            {errors.username && (
-              <small id="usernameHelp" className="error-text">
-                {errors.username}
-              </small>
-            )}
-          </div>
-
-          <div className="form-group">
-            <input
-              type="text"
-              name="phone"
-              placeholder="Phone Number"
-              value={formData.phone}
-              onChange={handleChange}
-              className={errors.phone ? "error" : ""}
-              aria-describedby="phoneHelp"
-              required
-              autoComplete="tel"
-            />
-            {errors.phone && (
-              <small id="phoneHelp" className="error-text">
-                {errors.phone}
-              </small>
-            )}
+            {errors.username && <small className="error-text">{errors.username}</small>}
           </div>
 
           <div className="form-group">
@@ -209,9 +143,21 @@ const Profile = () => {
               required
               autoComplete="country"
             />
-            {errors.country && (
-              <small className="error-text">{errors.country}</small>
-            )}
+            {errors.country && <small className="error-text">{errors.country}</small>}
+          </div>
+
+          <div className="form-group">
+            <input
+              type="text"
+              name="phone"
+              placeholder="Phone Number"
+              value={formData.phone}
+              onChange={handleChange}
+              className={errors.phone ? "error" : ""}
+              required
+              autoComplete="tel"
+            />
+            {errors.phone && <small className="error-text">{errors.phone}</small>}
           </div>
 
           <div className="form-group">
@@ -222,15 +168,10 @@ const Profile = () => {
               value={formData.password}
               onChange={handleChange}
               className={errors.password ? "error" : ""}
-              aria-describedby="passwordHelp"
               required
               autoComplete="new-password"
             />
-            {errors.password && (
-              <small id="passwordHelp" className="error-text">
-                {errors.password}
-              </small>
-            )}
+            {errors.password && <small className="error-text">{errors.password}</small>}
           </div>
 
           <div className="form-group">
@@ -244,9 +185,7 @@ const Profile = () => {
               required
               autoComplete="new-password"
             />
-            {errors.confirmPassword && (
-              <small className="error-text">{errors.confirmPassword}</small>
-            )}
+            {errors.confirmPassword && <small className="error-text">{errors.confirmPassword}</small>}
           </div>
 
           <button
@@ -255,15 +194,6 @@ const Profile = () => {
             className={isLoading ? "loading" : ""}
           >
             {isLoading ? "Creating Account..." : "Register"}
-          </button>
-
-          <button
-            type="button"
-            onClick={toggleAssistant}
-            className={`assistant-btn ${isAssistantActive ? "active" : ""}`}
-            aria-label={isAssistantActive ? "Turn off assistant" : "Turn on assistant"}
-          >
-            {isAssistantActive ? "Stop Assistant" : "Start Assistant"}
           </button>
         </form>
       </div>

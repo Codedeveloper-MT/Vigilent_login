@@ -1,110 +1,129 @@
 require('dotenv').config();
-const express = require("express");
-const mongoose = require("mongoose");
-const cors = require("cors");
-const bcrypt = require("bcryptjs");
+const express = require('express');
+const mongoose = require('mongoose');
+const cors = require('cors');
+const bcrypt = require('bcryptjs');
 
+// Initialize Express
 const app = express();
 
-// Enhanced CORS configuration
+// Database Connection
+const connectDB = async () => {
+  try {
+    await mongoose.connect(process.env.MONGODB_URI, {
+      useNewUrlParser: true,
+      useUnifiedTopology: true
+    });
+    console.log('MongoDB Connected');
+  } catch (err) {
+    console.error('Database connection error:', err.message);
+    process.exit(1);
+  }
+};
+connectDB();
+
+// Middleware
 app.use(cors({
   origin: [
-    'https://testing-fed3.onrender.com',
-    'http://localhost:3000'
+    process.env.FRONTEND_URL || 'http://localhost:5173',
+    'https://testing-fed3.onrender.com'
   ],
+  credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE'],
-  allowedHeaders: ['Content-Type', 'Authorization'],
-  credentials: true
+  allowedHeaders: ['Content-Type', 'Authorization']
 }));
 
 app.use(express.json());
 
-// MongoDB Connection
-const mongoURI = process.env.MONGODB_URI || process.env.MANGODB_CONNECT_URL;
-if (!mongoURI) {
-  console.error("FATAL ERROR: MongoDB connection URI is not defined");
-  process.exit(1);
-}
-
-mongoose.connect(mongoURI, {
-  useNewUrlParser: true,
-  useUnifiedTopology: true
-})
-.then(() => console.log("Connected to MongoDB!"))
-.catch(err => {
-  console.error("MongoDB connection error:", err.message);
-  process.exit(1);
-});
-
-// User Schema and Model
+// User Model
 const userSchema = new mongoose.Schema({
   username: { type: String, required: true, unique: true },
   country: { type: String, required: true },
   phone: { type: String, required: true },
   password: { type: String, required: true },
-  plainPassword: { type: String, select: false }
+  createdAt: { type: Date, default: Date.now }
 });
 
 userSchema.pre('save', async function(next) {
-  if (this.isModified('password')) {
-    this.password = await bcrypt.hash(this.password, 10);
+  if (!this.isModified('password')) return next();
+  try {
+    const salt = await bcrypt.genSalt(10);
+    this.password = await bcrypt.hash(this.password, salt);
+    next();
+  } catch (err) {
+    next(err);
   }
-  next();
 });
 
-const User = mongoose.model("User", userSchema);
+const User = mongoose.model('User', userSchema);
 
-// Health Check Endpoint
-app.get("/api/health", (req, res) => {
-  res.status(200).json({ status: "OK", timestamp: new Date() });
-});
-
-// Registration Endpoint
-app.post("/api/register", async (req, res) => {
+// Routes
+app.post('/api/register', async (req, res) => {
   try {
     const { username, country, phone, password } = req.body;
-    
+
+    // Validation
     if (!username || !country || !phone || !password) {
-      return res.status(400).json({ error: "All fields are required" });
+      return res.status(400).json({ 
+        error: 'All fields are required',
+        fields: { username, country, phone, password }
+      });
     }
 
+    // Check existing user
     const existingUser = await User.findOne({ username });
     if (existingUser) {
-      return res.status(409).json({ error: "Username already exists" });
+      return res.status(409).json({ 
+        error: 'Username already exists',
+        suggestion: `${username}${Math.floor(Math.random() * 100)}`
+      });
     }
 
-    const newUser = new User({ 
-      username, 
-      country, 
-      phone, 
-      password,
-      plainPassword: password 
-    });
-    
-    await newUser.save();
+    // Create new user
+    const user = new User({ username, country, phone, password });
+    await user.save();
 
-    res.status(201).json({ 
-      success: true, 
-      message: "Account created successfully",
-      user: { username, country, phone }
+    // Return success (without password)
+    const userResponse = { 
+      username: user.username,
+      country: user.country,
+      phone: user.phone,
+      createdAt: user.createdAt
+    };
+
+    res.status(201).json({
+      success: true,
+      message: 'User registered successfully',
+      user: userResponse
     });
+
   } catch (err) {
-    console.error("Registration error:", err);
+    console.error('Registration error:', err);
     res.status(500).json({ 
-      error: "Registration failed", 
-      details: err.message 
+      error: 'Registration failed',
+      details: process.env.NODE_ENV === 'development' ? err.message : undefined
     });
   }
 });
 
-// Error Handling Middleware
+// Health Check
+app.get('/api/health', (req, res) => {
+  res.status(200).json({ 
+    status: 'OK',
+    timestamp: new Date(),
+    database: mongoose.connection.readyState === 1 ? 'Connected' : 'Disconnected'
+  });
+});
+
+// Error Handling
 app.use((err, req, res, next) => {
   console.error(err.stack);
   res.status(500).json({ error: 'Internal Server Error' });
 });
 
-// Server Startup
+// Server Start
 const PORT = process.env.PORT || 5000;
-app.listen(PORT, '0.0.0.0', () => {
+app.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`);
+  console.log(`Allowed Origins: ${process.env.FRONTEND_URL || 'http://localhost:5173'}`);
 });

@@ -44,39 +44,40 @@ const Profile = () => {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    if (!validateForm()) {
-      setMessage({ text: "Please correct the errors in the form.", type: "error" });
-      return;
-    }
+    if (!validateForm()) return;
 
     setIsLoading(true);
     try {
+      const apiUrl = import.meta.env.PROD
+        ? 'https://https://testing-fed3.onrender.com/api/register'
+        : '/api/register';
+
       const response = await axios.post(
-        "https://https://testing-fed3.onrender.com/api/register",
+        apiUrl,
         {
           username: formData.username,
           country: formData.country,
           phone: formData.phone,
-          password: formData.password,
+          password: formData.password
         },
         {
-          headers: {
-            "Content-Type": "application/json",
-          },
-          withCredentials: true
+          headers: { 'Content-Type': 'application/json' },
+          timeout: 10000
         }
       );
 
       if (response.data.success) {
-        setMessage({ text: "Account created successfully!", type: "success" });
-        setTimeout(() => navigate("/login"), 2000);
+        setMessage({ text: 'Registration successful!', type: 'success' });
+        setTimeout(() => navigate('/login'), 2000);
       }
     } catch (error) {
-      console.error("Registration error:", error);
-      const errorMessage = error.response?.data?.error || 
-                         error.message || 
-                         "An error occurred during registration.";
-      setMessage({ text: errorMessage, type: "error" });
+      let errorMessage = 'Registration failed';
+      if (error.code === 'ERR_NETWORK') {
+        errorMessage = 'Cannot connect to server. Please check your connection.';
+      } else if (error.response) {
+        errorMessage = error.response.data.error || errorMessage;
+      }
+      setMessage({ text: errorMessage, type: 'error' });
     } finally {
       setIsLoading(false);
     }

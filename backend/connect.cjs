@@ -4,19 +4,29 @@ const mongoose = require("mongoose");
 const cors = require("cors");
 const bcrypt = require("bcryptjs");
 
+// Set strictQuery option
+mongoose.set('strictQuery', true);
+
 const app = express();
 
 // Enhanced CORS configuration
+const allowedOrigins = [
+  'https://testing-fed3.onrender.com',
+  'http://localhost:3000'
+];
+
 app.use(cors({
-  origin: [
-    'https://testing-fed3.onrender.com',
-    'http://localhost:3000'
-  ],
+  origin: allowedOrigins,
   methods: ['GET', 'POST', 'PUT', 'DELETE'],
   allowedHeaders: ['Content-Type', 'Authorization'],
-  credentials: true
+  credentials: true,
+  optionsSuccessStatus: 200
 }));
 
+// Handle preflight requests for all routes
+app.options('*', cors());
+
+// Parse incoming JSON
 app.use(express.json());
 
 // MongoDB Connection
@@ -56,7 +66,10 @@ const User = mongoose.model("User", userSchema);
 
 // Health Check Endpoint
 app.get("/api/health", (req, res) => {
-  res.status(200).json({ status: "OK", timestamp: new Date() });
+  res.status(200).json({
+    status: 'healthy',
+    timestamp: new Date().toISOString()
+  });
 });
 
 // Registration Endpoint
@@ -97,13 +110,13 @@ app.post("/api/register", async (req, res) => {
   }
 });
 
-// Error Handling Middleware
+// Global Error Handler
 app.use((err, req, res, next) => {
   console.error(err.stack);
   res.status(500).json({ error: 'Internal Server Error' });
 });
 
-// Server Startup
+// Start Server
 const PORT = process.env.PORT || 5000;
 app.listen(PORT, '0.0.0.0', () => {
   console.log(`Server running on port ${PORT}`);

@@ -1,7 +1,12 @@
+require('dotenv').config({ path: `${__dirname}/.env` });
+
 const express = require("express");
 const mongoose = require("mongoose");
 const cors = require("cors");
 const bcrypt = require("bcryptjs");
+
+// Handle Mongoose deprecation warning
+mongoose.set('strictQuery', false); // Add this line
 
 const app = express();
 
@@ -10,13 +15,29 @@ app.use(cors());
 app.use(express.json());
 
 // MongoDB Connection
-const mongoURI = process.env.MONGODB_CONNECT_URL; // Fixed typo from .env to process.env
-mongoose.connect(mongoURI)
-  .then(() => console.log("Connected to MongoDB Atlas!"))
-  .catch(err => {
-    console.error("MongoDB connection error:", err.message);
-    process.exit(1);
-  });
+const mongoURI = process.env.MANGODB_CONNECT_URL;
+
+// Debugging: Log the environment variables
+console.log("Environment Variables:");
+console.log("MANGODB_CONNECT_URL:", process.env.MANGODB_CONNECT_URL ? "exists" : "missing");
+console.log("PORT:", process.env.PORT);
+
+if (!mongoURI) {
+  console.error("FATAL ERROR: MongoDB connection URI is not defined");
+  console.error("Please check your .env file in:", __dirname);
+  process.exit(1);
+}
+
+mongoose.connect(mongoURI, {
+  useNewUrlParser: true,
+  useUnifiedTopology: true
+})
+.then(() => console.log("Connected to MongoDB Atlas!"))
+.catch(err => {
+  console.error("MongoDB connection error:", err.message);
+  process.exit(1);
+});
+
 
 // User Schema with composite key (username+password)
 const userSchema = new mongoose.Schema({

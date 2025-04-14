@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState } from "react";
 import axios from "axios";
 import { useNavigate } from "react-router-dom";
 import "./App.css";
@@ -17,7 +17,6 @@ const Profile = () => {
   const [isLoading, setIsLoading] = useState(false);
   const navigate = useNavigate();
 
-  // Handle form field changes
   const handleChange = (e) => {
     const { name, value } = e.target;
     setFormData((prev) => ({
@@ -29,42 +28,22 @@ const Profile = () => {
     }
   };
 
-  // Validate form data
   const validateForm = () => {
     const newErrors = {};
-
-    if (!formData.username.trim()) {
-      newErrors.username = "Username is required";
-    } else if (formData.username.length < 4) {
-      newErrors.username = "Username must be at least 4 characters";
-    }
-
-    if (!formData.country.trim()) {
-      newErrors.country = "Country is required";
-    }
-
-    if (!formData.phone.trim()) {
-      newErrors.phone = "Phone number is required";
-    }
-
-    if (!formData.password) {
-      newErrors.password = "Password is required";
-    } else if (formData.password.length < 5) {
-      newErrors.password = "Password must be at least 5 characters";
-    }
-
-    if (formData.password !== formData.confirmPassword) {
-      newErrors.confirmPassword = "Passwords do not match";
-    }
+    if (!formData.username.trim()) newErrors.username = "Username is required";
+    else if (formData.username.length < 4) newErrors.username = "Username must be at least 4 characters";
+    if (!formData.country.trim()) newErrors.country = "Country is required";
+    if (!formData.phone.trim()) newErrors.phone = "Phone number is required";
+    if (!formData.password) newErrors.password = "Password is required";
+    else if (formData.password.length < 5) newErrors.password = "Password must be at least 5 characters";
+    if (formData.password !== formData.confirmPassword) newErrors.confirmPassword = "Passwords do not match";
 
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
   };
 
-  // Handle form submission
   const handleSubmit = async (e) => {
     e.preventDefault();
-
     if (!validateForm()) {
       setMessage({ text: "Please correct the errors in the form.", type: "error" });
       return;
@@ -73,7 +52,7 @@ const Profile = () => {
     setIsLoading(true);
     try {
       const response = await axios.post(
-        "https://testing-fed3.onrender.com/api/register", 
+        "https://https://testing-fed3.onrender.com/api/register",
         {
           username: formData.username,
           country: formData.country,
@@ -84,22 +63,19 @@ const Profile = () => {
           headers: {
             "Content-Type": "application/json",
           },
+          withCredentials: true
         }
       );
 
       if (response.data.success) {
         setMessage({ text: "Account created successfully!", type: "success" });
-        setFormData({
-          username: "",
-          country: "",
-          phone: "",
-          password: "",
-          confirmPassword: "",
-        });
-        setTimeout(() => navigate("/login"), 3000);
+        setTimeout(() => navigate("/login"), 2000);
       }
     } catch (error) {
-      const errorMessage = error.response?.data?.error || "An error occurred during registration.";
+      console.error("Registration error:", error);
+      const errorMessage = error.response?.data?.error || 
+                         error.message || 
+                         "An error occurred during registration.";
       setMessage({ text: errorMessage, type: "error" });
     } finally {
       setIsLoading(false);
@@ -110,12 +86,7 @@ const Profile = () => {
     <div className="registration-container">
       <div className="form-container">
         <h2>Create an Account</h2>
-
-        {message.text && (
-          <p className={`message ${message.type}`}>
-            {message.text}
-          </p>
-        )}
+        {message.text && <p className={`message ${message.type}`}>{message.text}</p>}
 
         <form onSubmit={handleSubmit}>
           <div className="form-group">
@@ -127,7 +98,6 @@ const Profile = () => {
               onChange={handleChange}
               className={errors.username ? "error" : ""}
               required
-              autoComplete="username"
             />
             {errors.username && <small className="error-text">{errors.username}</small>}
           </div>
@@ -141,7 +111,6 @@ const Profile = () => {
               onChange={handleChange}
               className={errors.country ? "error" : ""}
               required
-              autoComplete="country"
             />
             {errors.country && <small className="error-text">{errors.country}</small>}
           </div>
@@ -155,7 +124,6 @@ const Profile = () => {
               onChange={handleChange}
               className={errors.phone ? "error" : ""}
               required
-              autoComplete="tel"
             />
             {errors.phone && <small className="error-text">{errors.phone}</small>}
           </div>
@@ -169,7 +137,6 @@ const Profile = () => {
               onChange={handleChange}
               className={errors.password ? "error" : ""}
               required
-              autoComplete="new-password"
             />
             {errors.password && <small className="error-text">{errors.password}</small>}
           </div>
@@ -183,16 +150,11 @@ const Profile = () => {
               onChange={handleChange}
               className={errors.confirmPassword ? "error" : ""}
               required
-              autoComplete="new-password"
             />
             {errors.confirmPassword && <small className="error-text">{errors.confirmPassword}</small>}
           </div>
 
-          <button
-            type="submit"
-            disabled={isLoading}
-            className={isLoading ? "loading" : ""}
-          >
+          <button type="submit" disabled={isLoading}>
             {isLoading ? "Creating Account..." : "Register"}
           </button>
         </form>

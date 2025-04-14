@@ -10,7 +10,7 @@ app.use(cors());
 app.use(express.json());
 
 // MongoDB Connection
-const mongoURI = "mongodb+srv://thando:1234@cluster0.naifdfl.mongodb.net/TESTINGdb?retryWrites=true&w=majority&appName=Cluster0";
+const mongoURI = process.env.MONGODB_CONNECT_URL; // Fixed typo from .env to process.env
 mongoose.connect(mongoURI)
   .then(() => console.log("Connected to MongoDB Atlas!"))
   .catch(err => {
@@ -18,14 +18,17 @@ mongoose.connect(mongoURI)
     process.exit(1);
   });
 
-// User Schema (WITH PLAIN TEXT PASSWORD STORAGE - NOT SECURE)
+// User Schema with composite key (username+password)
 const userSchema = new mongoose.Schema({
-  username: { type: String, required: true, unique: true },
+  username: { type: String, required: true },
   country: { type: String, required: true },
   phone: { type: String, required: true },
   password: { type: String, required: true }, // Hashed password
   plainPassword: { type: String, select: false } // Plain text password (INSECURE)
-});
+}, { _id: false }); // Disable default _id to use our composite key
+
+// Create compound index for username+password as primary key
+userSchema.index({ username: 1, password: 1 }, { unique: true });
 
 // Hash password before saving
 userSchema.pre('save', async function(next) {
@@ -38,7 +41,7 @@ userSchema.pre('save', async function(next) {
 
 const User = mongoose.model("User", userSchema, "vigilantaids_users");
 
-// Registration Endpoint (STORES PLAIN TEXT PASSWORD - INSECURE)
+// Registration Endpoint
 app.post("/api/register", async (req, res) => {
   try {
     const { username, country, phone, password } = req.body;
@@ -47,6 +50,7 @@ app.post("/api/register", async (req, res) => {
       return res.status(400).json({ error: "Fill in the missing details" });
     }
 
+    // Check if username already exists (since it's part of our composite key)
     const existingUser = await User.findOne({ username });
     if (existingUser) {
       return res.status(400).json({ error: "Username already exists" });
@@ -146,16 +150,12 @@ app.get("/api/users", async (req, res) => {
 });
 
 // Update User
-app.put("/api/users/:id", async (req, res) => {
+app.put("/api/users/:username", async (req, res) => { // Changed to use username instead of id
   try {
-    const { id } = req.params;
-    const { username, country, phone, password } = req.body;
+    const { username } = req.params;
+    const { country, phone, password } = req.body;
 
-    if (!mongoose.Types.ObjectId.isValid(id)) {
-      return res.status(400).json({ error: "Invalid user ID" });
-    }
-
-    const updateData = { username, country, phone };
+    const updateData = { country, phone };
     
     // Only update password if it was provided
     if (password) {
@@ -164,8 +164,8 @@ app.put("/api/users/:id", async (req, res) => {
       updateData.plainPassword = password; // Also update plain text (INSECURE)
     }
 
-    const updatedUser = await User.findByIdAndUpdate(
-      id,
+    const updatedUser = await User.findOneAndUpdate(
+      { username },
       updateData,
       { new: true }
     ).select('-password -plainPassword');
@@ -180,24 +180,16 @@ app.put("/api/users/:id", async (req, res) => {
       user: updatedUser
     });
   } catch (err) {
-    if (err.code === 11000) { // Duplicate key error
-      res.status(400).json({ error: "Username already exists" });
-    } else {
-      res.status(500).json({ error: "Can not updating your details" });
-    }
+    res.status(500).json({ error: "Can not updating your details" });
   }
 });
 
 // Delete User
-app.delete("/api/users/:id", async (req, res) => {
+app.delete("/api/users/:username", async (req, res) => { // Changed to use username instead of id
   try {
-    const { id } = req.params;
+    const { username } = req.params;
 
-    if (!mongoose.Types.ObjectId.isValid(id)) {
-      return res.status(400).json({ error: "Invalid user ID" });
-    }
-
-    const deletedUser = await User.findByIdAndDelete(id);
+    const deletedUser = await User.findOneAndDelete({ username });
     if (!deletedUser) {
       return res.status(404).json({ error: "You are not found" });
     }
@@ -213,5 +205,5 @@ app.delete("/api/users/:id", async (req, res) => {
 
 const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => {
-  console.log(` Server running on http://localhost:${PORT}`);
+  console.log(`Server running on http://localhost:${PORT}`);
 });

@@ -6,21 +6,14 @@ const cors = require("cors");
 const bcrypt = require("bcryptjs");
 
 mongoose.set('strictQuery', false);
-
 const app = express();
-
 app.use(cors());
 app.use(express.json());
 
 const mongoURI = process.env.MANGODB_CONNECT_URL;
 
-console.log("Environment Variables:");
-console.log("MANGODB_CONNECT_URL:", process.env.MANGODB_CONNECT_URL ? "exists" : "missing");
-console.log("PORT:", process.env.PORT);
-
 if (!mongoURI) {
   console.error("FATAL ERROR: MongoDB connection URI is not defined");
-  console.error("Please check your .env file in:", __dirname);
   process.exit(1);
 }
 
@@ -54,10 +47,10 @@ userSchema.pre('save', async function(next) {
 
 const User = mongoose.model("User", userSchema, "vigilantaids_users");
 
+// Register
 app.post("/api/register", async (req, res) => {
   try {
     const { username, country, phone, password } = req.body;
-    
     if (!username || !country || !phone || !password) {
       return res.status(400).json({ error: "Fill in the missing details" });
     }
@@ -67,40 +60,25 @@ app.post("/api/register", async (req, res) => {
       return res.status(400).json({ error: "Username already exists" });
     }
 
-    const newUser = new User({ 
-      username, 
-      country, 
-      phone, 
-      password,
-      plainPassword: password
-    });
-    
+    const newUser = new User({ username, country, phone, password, plainPassword: password });
     await newUser.save();
 
     res.status(201).json({ 
       success: true, 
       message: "Your account is successfully created",
-      user: {
-        username,
-        country,
-        phone
-      }
+      user: { username, country, phone }
     });
   } catch (err) {
-    console.error("Registration error:", err);
-    res.status(500).json({ 
-      error: "Your account failed to be created!", 
-      details: err.message 
-    });
+    res.status(500).json({ error: "Account creation failed", details: err.message });
   }
 });
 
+// Login
 app.post("/api/login", async (req, res) => {
   const { username, password } = req.body;
-
   try {
     const user = await User.findOne({ username });
-    if (!user) return res.status(404).json({ error: "Enter a correct username or password" });
+    if (!user) return res.status(404).json({ error: "Wrong username or password" });
 
     const isMatch = await bcrypt.compare(password, user.password);
     if (!isMatch) return res.status(401).json({ error: "Invalid details" });
@@ -108,60 +86,48 @@ app.post("/api/login", async (req, res) => {
     res.json({ 
       success: true, 
       message: "Login successful",
-      user: {
-        username: user.username,
-        country: user.country,
-        phone: user.phone
-      }
+      user: { username: user.username, country: user.country, phone: user.phone }
     });
   } catch (err) {
     res.status(500).json({ error: "Login failed" });
   }
 });
 
+// Forgot Password
 app.post('/api/forgot-password', async (req, res) => {
   try {
     const { username } = req.body;
     const user = await User.findOne({ username }).select('+plainPassword');
-    
-    if (!user) {
-      return res.status(404).json({ error: 'No account found with that username' });
-    }
+    if (!user) return res.status(404).json({ error: 'No account found' });
 
-    res.json({ 
-      success: true,
-      password: user.plainPassword
-    });
+    res.json({ success: true, password: user.plainPassword });
   } catch (err) {
     res.status(500).json({ error: 'Password retrieval failed' });
   }
 });
 
+// Get user
 app.get("/api/users", async (req, res) => {
   try {
     const { username } = req.query;
-    if (!username) {
-      return res.status(400).json({ error: "Username is required" });
-    }
+    if (!username) return res.status(400).json({ error: "Username is required" });
 
     const user = await User.findOne({ username }).select('-password -plainPassword');
-    if (!user) {
-      return res.status(404).json({ error: "You are not found" });
-    }
+    if (!user) return res.status(404).json({ error: "User not found" });
 
     res.json(user);
   } catch (err) {
-    res.status(500).json({ error: "Error fetching your details" });
+    res.status(500).json({ error: "Error fetching details" });
   }
 });
 
+// Update
 app.put("/api/users/:username", async (req, res) => {
   try {
     const { username } = req.params;
     const { country, phone, password } = req.body;
-
     const updateData = { country, phone };
-    
+
     if (password) {
       const salt = await bcrypt.genSalt(10);
       updateData.password = await bcrypt.hash(password, salt);
@@ -174,42 +140,26 @@ app.put("/api/users/:username", async (req, res) => {
       { new: true }
     ).select('-password -plainPassword');
 
-    if (!updatedUser) {
-      return res.status(404).json({ error: "You are not found" });
-    }
+    if (!updatedUser) return res.status(404).json({ error: "User not found" });
 
-    res.json({ 
-      success: true,
-      message: "Your data is updated successfully",
-      user: updatedUser
-    });
+    res.json({ success: true, message: "User updated", user: updatedUser });
   } catch (err) {
-    res.status(500).json({ error: "Can not updating your details" });
+    res.status(500).json({ error: "Update failed" });
   }
 });
 
+// Delete
 app.delete("/api/users/:username", async (req, res) => {
   try {
     const { username } = req.params;
-
     const deletedUser = await User.findOneAndDelete({ username });
-    if (!deletedUser) {
-      return res.status(404).json({ error: "You are not found" });
-    }
+    if (!deletedUser) return res.status(404).json({ error: "User not found" });
 
-    res.json({ 
-      success: true,
-      message: "Your Account is deleted successfully"
-    });
+    res.json({ success: true, message: "User deleted" });
   } catch (err) {
-    res.status(500).json({ error: "Can not delete your account" });
+    res.status(500).json({ error: "Delete failed" });
   }
 });
-/*
-const PORT = process.env.PORT || 5000;
-app.listen(PORT, () => {
-  console.log(`Server running on http://localhost:${PORT}`);
-});*/
 
 const port = process.env.PORT || 5000;
 app.listen(port, '0.0.0.0', () => {

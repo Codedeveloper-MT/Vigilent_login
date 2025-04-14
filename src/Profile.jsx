@@ -107,7 +107,7 @@ const Profile = () => {
     setIsLoading(true);
     try {
       const response = await axios.post(
-        "http://10.220.145.219:5173/",
+        "http://10.220.185.190:5000/api/register",
         {
           username: formData.username,
           country: formData.country,

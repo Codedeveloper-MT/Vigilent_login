@@ -18,6 +18,9 @@ const Profile = () => {
   const [isLoading, setIsLoading] = useState(false);
   const navigate = useNavigate();
 
+  // Use Render's environment variable or fallback to local development
+  const API_BASE_URL = import.meta.env.VITE_API_URL || "http://localhost:5000";
+
   const speak = (text) => {
     if (!isAssistantActive) return;
     if ("speechSynthesis" in window) {
@@ -107,7 +110,7 @@ const Profile = () => {
     setIsLoading(true);
     try {
       const response = await axios.post(
-        "http://10.220.185.190:5000/api/register",
+        `${API_BASE_URL}/api/register`,
         {
           username: formData.username,
           country: formData.country,
@@ -140,6 +143,8 @@ const Profile = () => {
         errorMessage = error.response.data.error;
       } else if (error.message) {
         errorMessage = error.message;
+      } else if (error.request) {
+        errorMessage = "Network error - could not connect to server";
       }
       setMessage({ text: errorMessage, type: "error" });
       speak(errorMessage);

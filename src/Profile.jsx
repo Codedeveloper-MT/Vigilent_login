@@ -49,7 +49,7 @@ const Profile = () => {
     setIsLoading(true);
     try {
       const apiUrl = import.meta.env.PROD
-        ? 'https://testing-blond-five.vercel.app/register'
+        ? 'https://https://testing-fed3.onrender.com/api/register'
         : '/api/register';
 
       const response = await axios.post(
